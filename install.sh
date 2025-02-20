@@ -72,6 +72,7 @@ echo "Only SSH key-based authentication is allowed. Keep your private key safe!"
 # Update system packages
 echo "Updating system packages..."
 apt update && apt upgrade -y
+apt install -y build-essential python3 make gcc g++ liblzma-dev
 
 # Install Node.js
 echo "Installing Node.js..."
@@ -96,6 +97,7 @@ echo "Extraction complete!"
 echo "Building and running xandminer app..."
 cd xandminer
 npm install
+npm run build
 npm start &
 
 cd ..
