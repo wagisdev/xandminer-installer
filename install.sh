@@ -103,6 +103,7 @@ EOL
     wget -O xandminerd.tar.gz "https://github.com/Maverick9081/packages/raw/refs/heads/master/xandminerd.tar.gz"
     wget -O xandminer.tar.gz "https://github.com/Maverick9081/packages/raw/refs/heads/master/xandminer.tar.gz"
     wget -O xandminerd.service "https://raw.githubusercontent.com/Maverick9081/packages/refs/heads/master/xandminerd.service"
+    wget -O xandminer.service "https://raw.githubusercontent.com/Maverick9081/packages/refs/heads/master/xandminer.service"
 
     echo "Extracting application files..."
     tar -xzvf xandminerd.tar.gz
@@ -113,24 +114,27 @@ EOL
 
     echo "Extraction complete!"
 
+    echo "Setting up Xandminer web as a system service..."
+    cp /root/xandminer.service /etc/systemd/system/
+
     # Build and run xandminer app
     echo "Building and running xandminer app..."
     cd xandminer
     npm install
     npm run build
-    npm start &
-
     cd ..
+
+    systemctl daemon-reload
+    systemctl enable xandminer.service --now
 
     cp /root/xandminerd.service /etc/systemd/system/
 
     # Set up Xandminer as a service
-    echo "Setting up Xandminer as a system service..."
+    echo "Setting up Xandminerd as a system service..."
     cd /root/xandminerd
-    npm i
+    npm install
     systemctl daemon-reload
-    systemctl enable xandminerd.service
-    systemctl start xandminerd.service
+    systemctl enable xandminerd.service --now
 
     echo "Setup completed successfully!"
 
@@ -139,10 +143,9 @@ EOL
 stop_service() {
     echo "Stopping Xandeum services..."
 
-    echo "Stopping xandminer frontend..."
-    pkill -f "npm start"
-    pkill -f "xandminer"
-
+    echo "Stopping xandminer web service..."
+    systemctl stop xandminer.service
+   
     echo "Stopping xandminerd system service..."
     systemctl stop xandminerd.service
 
@@ -153,6 +156,7 @@ disable_service() {
     echo "Disabling Xandeum service..."
 
     systemctl disable xandminerd.service --now
+    systemctl disable xandminer.service --now
 }
 
 show_menu
