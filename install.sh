@@ -34,15 +34,13 @@ EOF
 show_menu() {
     echo "Please select an option:"
     echo "1. Install Xandeum Setup"
-    echo "2. Stop Service"
-    echo "3. Disable Service"
-    echo "4. Exit"
-    read -p "Enter your choice (1-4):" choice
+    echo "2. Stop/Restart/Disable Service"
+    echo "3. Exit"
+    read -p "Enter your choice (1-3):" choice
     case $choice in
     1) start_install ;;
-    2) stop_service ;;
-    3) disable_service ;;
-    4)
+    2) actions ;;
+    3)
         echo "Exiting..."
         exit 0
         ;;
@@ -93,15 +91,15 @@ EOL
     curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
     apt-get install -y nodejs
 
-    if [ -d "xandminer" ] || [ -d "xandminerd" ]; then
-        echo "Error: xandminer or xandminerd directory already exists."
-        echo "Please remove them before running the setup again."
-        exit 1
+    if [ -d "xandminer" ] && [ -d "xandminerd" ]; then
+        [ -d "xandminer" ] && (cd xandminer && git pull)
+        [ -d "xandminerd" ] && (cd xandminerd && git pull)
+    else
+        git clone https://github.com/Xandeum/xandminer.git
+        git clone https://github.com/Xandeum/xandminerd.git
     fi
 
     echo "Downloading application files..."
-    git clone https://github.com/Xandeum/xandminer.git
-    git clone https://github.com/Xandeum/xandminerd.git
     wget -O xandminerd.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminerd.service"
     wget -O xandminer.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminer.service"
 
@@ -131,6 +129,8 @@ EOL
 
     echo "Xandminerd Service Running On Port : 4000"
 
+    rm xandminer.service xandminerd.service
+
     echo "Setup completed successfully!"
 
 }
@@ -152,6 +152,34 @@ disable_service() {
 
     systemctl disable xandminerd.service --now
     systemctl disable xandminer.service --now
+}
+
+restart_service() {
+    echo "Restarting Xandeum service..."
+    systemctl daemon-reload
+    systemctl restart xandminerd.service
+    systemctl restart xandminer.service
+}
+
+actions() {
+    echo "1. Restart Service"
+    echo "2. Stop Service"
+    echo "3. Disable Service"
+    echo "4. Previous Menu"
+
+    read -p "Enter your choice (1-4): " choice
+    case $choice in
+    1) restart_service ;;
+    2) stop_service ;;
+    3) disable_service ;;
+    4)
+        show_menu
+        ;;
+    *)
+        echo "Invalid option. Please try again."
+        actions
+        ;;
+    esac
 }
 
 show_menu
