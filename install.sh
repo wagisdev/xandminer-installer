@@ -100,19 +100,10 @@ EOL
     fi
 
     echo "Downloading application files..."
-    wget -O xandminerd.tar.gz "https://github.com/Maverick9081/packages/raw/refs/heads/master/xandminerd.tar.gz"
-    wget -O xandminer.tar.gz "https://github.com/Maverick9081/packages/raw/refs/heads/master/xandminer.tar.gz"
+    git clone https://github.com/Xandeum/xandminer.git
+    git clone https://github.com/Xandeum/xandminerd.git
     wget -O xandminerd.service "https://raw.githubusercontent.com/Maverick9081/packages/refs/heads/master/xandminerd.service"
     wget -O xandminer.service "https://raw.githubusercontent.com/Maverick9081/packages/refs/heads/master/xandminer.service"
-
-    echo "Extracting application files..."
-    tar -xzvf xandminerd.tar.gz
-    tar -xzvf xandminer.tar.gz
-
-    # Clean up tar.gz files (optional)
-    rm xandminerd.tar.gz xandminer.tar.gz
-
-    echo "Extraction complete!"
 
     echo "Setting up Xandminer web as a system service..."
     cp /root/xandminer.service /etc/systemd/system/
@@ -127,6 +118,8 @@ EOL
     systemctl daemon-reload
     systemctl enable xandminer.service --now
 
+    echo "Xandminer web Service Running On Port : 3000"
+
     cp /root/xandminerd.service /etc/systemd/system/
 
     # Set up Xandminer as a service
@@ -135,6 +128,8 @@ EOL
     npm install
     systemctl daemon-reload
     systemctl enable xandminerd.service --now
+
+    echo "Xandminerd Service Running On Port : 4000"
 
     echo "Setup completed successfully!"
 
@@ -145,7 +140,7 @@ stop_service() {
 
     echo "Stopping xandminer web service..."
     systemctl stop xandminer.service
-   
+
     echo "Stopping xandminerd system service..."
     systemctl stop xandminerd.service
 
