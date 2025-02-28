@@ -102,8 +102,8 @@ EOL
     echo "Downloading application files..."
     git clone https://github.com/Xandeum/xandminer.git
     git clone https://github.com/Xandeum/xandminerd.git
-    wget -O xandminerd.service "https://raw.githubusercontent.com/Maverick9081/packages/refs/heads/master/xandminerd.service"
-    wget -O xandminer.service "https://raw.githubusercontent.com/Maverick9081/packages/refs/heads/master/xandminer.service"
+    wget -O xandminerd.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminerd.service"
+    wget -O xandminer.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminer.service"
 
     echo "Setting up Xandminer web as a system service..."
     cp /root/xandminer.service /etc/systemd/system/
