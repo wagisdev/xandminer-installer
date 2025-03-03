@@ -128,10 +128,12 @@ EOL
     systemctl enable xandminerd.service --now
 
     echo "Xandminerd Service Running On Port : 4000"
-    
+
     cd ..
 
     rm xandminer.service xandminerd.service
+
+    echo "To access your Xandminer, use address localhost:3000 in your web browser"
 
     echo "Setup completed successfully!"
 
