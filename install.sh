@@ -37,7 +37,7 @@ show_menu() {
     echo "2. Stop/Restart/Disable Service"
     echo "3. Update Xandeum Setup"
     echo "4. Enable SSH Best Practice (Secure Access)"
-    echo "4. Exit"
+    echo "5. Exit"
     read -p "Enter your choice (1-5):" choice
     case $choice in
     1) start_install ;;
