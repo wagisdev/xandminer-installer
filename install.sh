@@ -33,16 +33,16 @@ EOF
 
 show_menu() {
     echo "Please select an option:"
-    echo "1. Install Xandeum Setup"
-    echo "2. Stop/Restart/Disable Service"
-    echo "3. Update Xandeum Setup"
-    echo "4. Enable SSH Best Practice (Secure Access)"
+    echo "1. Install Xandeum pNode Software"
+    echo "2. Update Xandeum pNode Software"
+    echo "3. Stop/Restart/Disable Service"
+    echo "4. Harden SSH (Disable Password Login)"
     echo "5. Exit"
     read -p "Enter your choice (1-5):" choice
     case $choice in
     1) start_install ;;
-    2) actions ;;
-    3) upgrade_install ;;
+    2) upgrade_install ;;
+    3) actions ;;
     4) harden_ssh ;;
     5)
         echo "Exiting..."
@@ -80,7 +80,7 @@ harden_ssh () {
     # Handle sshd.d directory if it exists
     if [ -d /etc/ssh/sshd_config.d ]; then
         echo "Configuring SSH settings in /etc/ssh/sshd_config.d..."
-        SSHD_D_FILE="/etc/ssh/sshd_config.d/99-disable-password-auth.conf"
+        SSHD_D_FILE="/etc/ssh/sshd_config.d/10-disable-password-auth.conf"
         cat >"$SSHD_D_FILE" <<EOL
         PasswordAuthentication no
         ChallengeResponseAuthentication no
