@@ -35,12 +35,16 @@ show_menu() {
     echo "Please select an option:"
     echo "1. Install Xandeum Setup"
     echo "2. Stop/Restart/Disable Service"
-    echo "3. Exit"
-    read -p "Enter your choice (1-3):" choice
+    echo "3. Update Xandeum Setup"
+    echo "4. Enable SSH Best Practice (Secure Access)"
+    echo "5. Exit"
+    read -p "Enter your choice (1-5):" choice
     case $choice in
     1) start_install ;;
     2) actions ;;
-    3)
+    3) upgrade_install ;;
+    4) harden_ssh ;;
+    5)
         echo "Exiting..."
         exit 0
         ;;
@@ -51,13 +55,16 @@ show_menu() {
     esac
 }
 
-start_install() {
+sudoCheck () {
     # Check for root/sudo privileges
     if [[ $EUID -ne 0 ]]; then
         echo "This script must be run as root or with sudo. Please try again with sudo."
         exit 1
     fi
+}
 
+harden_ssh () {
+    sudoCheck
     # Backup current sshd_config and sshd.d files
     echo "Backing up SSH configuration files..."
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak-$(date +%Y%m%d%H%M%S)
@@ -80,7 +87,20 @@ start_install() {
 EOL
         chmod 644 "$SSHD_D_FILE"
     fi
+    echo "Setup completed successfully!"
+}
 
+upgrade_install () {
+    sudoCheck
+    stop_service
+    start_install
+    echo "Upgrade completed successfully!"
+    restart_service
+    echo "Service restart completed."
+}
+
+start_install() {
+    sudoCheck
     # Update system packages
     echo "Updating system packages..."
     apt update && apt upgrade -y
