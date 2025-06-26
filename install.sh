@@ -55,7 +55,7 @@ show_menu() {
     esac
 }
 
-sudoCheck () {
+sudoCheck() {
     # Check for root/sudo privileges
     if [[ $EUID -ne 0 ]]; then
         echo "This script must be run as root or with sudo. Please try again with sudo."
@@ -63,7 +63,7 @@ sudoCheck () {
     fi
 }
 
-harden_ssh () {
+harden_ssh() {
     sudoCheck
     # Backup current sshd_config and sshd.d files
     echo "Backing up SSH configuration files..."
@@ -90,7 +90,7 @@ EOL
     echo "Setup completed successfully!"
 }
 
-upgrade_install () {
+upgrade_install() {
     sudoCheck
     stop_service
     start_install
@@ -112,9 +112,34 @@ start_install() {
     apt-get install -y nodejs
 
     if [ -d "xandminer" ] && [ -d "xandminerd" ]; then
-        [ -d "xandminer" ] && (cd xandminer && git pull)
-        [ -d "xandminerd" ] && (cd xandminerd && git pull)
+        echo "Repositories already exist. Pulling latest changes..."
+
+        (
+            cd xandminer
+            git stash push -m "Auto-stash before pull" || true
+            git pull
+        )
+
+        (
+            cd xandminerd
+            git stash push -m "Auto-stash before pull" || true
+            git pull
+
+            if [ -f "keypairs/pnode-keypair.json" ]; then
+                echo "Found pnode-keypair.json. Copying to /local/keypairs/ if not already present..."
+
+                mkdir -p /local/keypairs
+
+                if [ ! -f "/local/keypairs/pnode-keypair.json" ]; then
+                    cp keypairs/pnode-keypair.json /local/keypairs/
+                    echo "Copied pnode-keypair.json to /local/keypairs/"
+                else
+                    echo "pnode-keypair.json already exists in /local/keypairs/. Skipping copy."
+                fi
+            fi
+        )
     else
+        echo "Cloning repositories..."
         git clone https://github.com/Xandeum/xandminer.git
         git clone https://github.com/Xandeum/xandminerd.git
     fi
