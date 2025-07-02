@@ -144,7 +144,7 @@ start_install() {
         git clone https://github.com/Xandeum/xandminerd.git
     fi
 
-    install_pod() 
+    install_pod
     echo "Downloading application files..."
     wget -O xandminerd.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminerd.service"
     wget -O xandminer.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminer.service"
