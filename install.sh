@@ -144,7 +144,7 @@ start_install() {
         git clone https://github.com/Xandeum/xandminerd.git
     fi
 
-    echo "Downloading application files..."
+    install_pod() echo "Downloading application files..."
     wget -O xandminerd.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminerd.service"
     wget -O xandminer.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminer.service"
 
@@ -208,6 +208,50 @@ restart_service() {
     systemctl daemon-reload
     systemctl restart xandminerd.service
     systemctl restart xandminer.service
+}
+
+install_pod() {
+    sudo apt-get install -y apt-transport-https ca-certificates
+
+    echo "deb [trusted=yes] https://xandeum.github.io/pod-apt-package/ stable main" | sudo tee /etc/apt/sources.list.d/xandeum-pod.list
+
+    sudo apt-get update
+
+    sudo apt-get install pod
+
+    SERVICE_FILE="/etc/systemd/system/pod.service"
+
+    sudo tee "$SERVICE_FILE" >/dev/null <<EOF
+[Unit]
+Description= Xandeum Pod System service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/pod 
+Restart=always
+User=root
+Environment=NODE_ENV=production
+Environment=RUST_LOG=info
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=xandeum-pod
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    echo "Reloading systemd..."
+    sudo systemctl daemon-reload
+
+    echo " Enabling pod.service..."
+    sudo systemctl enable pod.service
+
+    echo "Starting pod.service..."
+    sudo systemctl start pod.service
+
+    echo " pod.service is now running. Check status with:"
+    echo " sudo systemctl status pod.service"
+
 }
 
 actions() {
