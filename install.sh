@@ -230,6 +230,7 @@ After=network.target
 [Service]
 ExecStart=/usr/bin/pod 
 Restart=always
+RestartSec=2
 User=root
 Environment=NODE_ENV=production
 Environment=RUST_LOG=info
