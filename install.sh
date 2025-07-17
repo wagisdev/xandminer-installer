@@ -292,6 +292,9 @@ ensure_xandeum_pod_tmpfile() {
     else
         echo "$TMPFILE already exists, skipping creation."
     fi
+
+        # Create the symlink immediately
+    systemd-tmpfiles --create
 }
 
 show_menu
