@@ -214,6 +214,7 @@ restart_service() {
     fi
 
     systemctl daemon-reload
+    systemctl restart pod.service
     systemctl restart xandminerd.service
     systemctl restart xandminer.service
 }
