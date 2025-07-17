@@ -206,11 +206,17 @@ disable_service() {
 
 restart_service() {
     echo "Restarting Xandeum service..."
+
+    # Ensure /run/xandeum-pod symlink exists
+    if [ ! -L /run/xandeum-pod ]; then
+        echo "/run/xandeum-pod symlink missing. Recreating with systemd-tmpfiles..."
+        systemd-tmpfiles --create
+    fi
+
     systemctl daemon-reload
     systemctl restart xandminerd.service
     systemctl restart xandminer.service
 }
-
 install_pod() {
     sudo apt-get install -y apt-transport-https ca-certificates
 
