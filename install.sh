@@ -26,8 +26,6 @@ cat <<"EOF"
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢪⢪⢪⢸⢨⢢⢑⢆⠣⡊⡢⡑⢌⠢⡡⡑⡐⠅⠌⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠀⠂⠈⠈⠊⠈⠐⠐⠁⠑⠈⠂⠑⠑⠈⠊⠐⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⣠⢺⡸⡸⡸⡸⡸⡨⡪⡊⡆⡣⡱⡨⢪⠨⡊⢔⠌⠂⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⢠⢞⡕⡧⡳⡹⡸⡪⡪⡪⡪⡪⡊⡎⡢⡣⡑⠕⠘⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 EOF
 
@@ -94,6 +92,7 @@ upgrade_install() {
     sudoCheck
     stop_service
     start_install
+    ensure_xandeum_pod_tmpfile
     echo "Upgrade completed successfully!"
     restart_service
     echo "Service restart completed."
@@ -183,6 +182,7 @@ start_install() {
 
     echo "Setup completed successfully!"
 
+    ensure_xandeum_pod_tmpfile
 }
 
 stop_service() {
@@ -206,11 +206,18 @@ disable_service() {
 
 restart_service() {
     echo "Restarting Xandeum service..."
+
+    # Ensure /run/xandeum-pod symlink exists
+    if [ ! -L /run/xandeum-pod ]; then
+        echo "/run/xandeum-pod symlink missing. Recreating with systemd-tmpfiles..."
+        systemd-tmpfiles --create
+    fi
+
     systemctl daemon-reload
+    systemctl restart pod.service
     systemctl restart xandminerd.service
     systemctl restart xandminer.service
 }
-
 install_pod() {
     sudo apt-get install -y apt-transport-https ca-certificates
 
@@ -230,6 +237,7 @@ After=network.target
 [Service]
 ExecStart=/usr/bin/pod 
 Restart=always
+RestartSec=2
 User=root
 Environment=NODE_ENV=production
 Environment=RUST_LOG=info
@@ -274,6 +282,19 @@ actions() {
         actions
         ;;
     esac
+}
+
+ensure_xandeum_pod_tmpfile() {
+    TMPFILE="/etc/tmpfiles.d/xandeum-pod.conf"
+    if [ ! -f "$TMPFILE" ]; then
+        echo "L /run/xandeum-pod - - - - /xandeum-pages" > "$TMPFILE"
+        echo "Created $TMPFILE"
+    else
+        echo "$TMPFILE already exists, skipping creation."
+    fi
+
+        # Create the symlink immediately
+    systemd-tmpfiles --create
 }
 
 show_menu
