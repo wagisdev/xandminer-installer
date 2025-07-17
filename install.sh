@@ -207,6 +207,9 @@ disable_service() {
 restart_service() {
     echo "Restarting Xandeum service..."
 
+    # Ensure /etc/tmpfiles.d/xandeum-pod.conf exists and is correct
+    ensure_xandeum_pod_tmpfile
+
     # Ensure /run/xandeum-pod symlink exists
     if [ ! -L /run/xandeum-pod ]; then
         echo "/run/xandeum-pod symlink missing. Recreating with systemd-tmpfiles..."
