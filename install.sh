@@ -230,6 +230,39 @@ install_pod() {
 
     sudo apt-get install pod
 
+    # Ask for keypair path
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Keypair Configuration"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Would you like to provide a custom keypair path for the pod service?"
+    echo "If you provide a path, the pod will start with --keypair flag."
+    echo "If you skip this (press Enter), the pod will use its default behavior."
+    echo ""
+    read -p "Enter full path to keypair file (or press Enter to skip): " KEYPAIR_PATH
+
+    # Construct ExecStart command based on user input
+    if [ -n "$KEYPAIR_PATH" ]; then
+        # Validate the path exists
+        if [ -f "$KEYPAIR_PATH" ]; then
+            echo "Using keypair at: $KEYPAIR_PATH"
+            EXEC_START_CMD="/usr/bin/pod --keypair $KEYPAIR_PATH"
+        else
+            echo "WARNING: File not found at $KEYPAIR_PATH"
+            read -p "File doesn't exist. Continue anyway? (y/n): " CONTINUE
+            if [[ "$CONTINUE" =~ ^[Yy]$ ]]; then
+                echo "Proceeding with the provided path anyway..."
+                EXEC_START_CMD="/usr/bin/pod --keypair $KEYPAIR_PATH"
+            else
+                echo "Using default pod configuration without keypair flag."
+                EXEC_START_CMD="/usr/bin/pod"
+            fi
+        fi
+    else
+        echo "No keypair path provided. Using default pod configuration."
+        EXEC_START_CMD="/usr/bin/pod"
+    fi
+
     SERVICE_FILE="/etc/systemd/system/pod.service"
 
     sudo tee "$SERVICE_FILE" >/dev/null <<EOF
@@ -238,7 +271,7 @@ Description= Xandeum Pod System service
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/pod 
+ExecStart=$EXEC_START_CMD
 Restart=always
 RestartSec=2
 User=root
