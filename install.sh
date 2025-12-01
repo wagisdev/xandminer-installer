@@ -34,15 +34,17 @@ show_menu() {
     echo "1. Install Xandeum pNode Software"
     echo "2. Update Xandeum pNode Software"
     echo "3. Stop/Restart/Disable Service"
-    echo "4. Harden SSH (Disable Password Login)"
-    echo "5. Exit"
-    read -p "Enter your choice (1-5):" choice
+    echo "4. Upgrade This Installer Script"
+    echo "5. Harden SSH (Disable Password Login)"
+    echo "6. Exit"
+    read -p "Enter your choice (1-6):" choice
     case $choice in
     1) start_install ;;
     2) upgrade_install ;;
     3) actions ;;
-    4) harden_ssh ;;
-    5)
+    4) upgrade_installer_script ;;
+    5) harden_ssh ;;
+    6)
         echo "Exiting..."
         exit 0
         ;;
@@ -58,6 +60,55 @@ sudoCheck() {
     if [[ $EUID -ne 0 ]]; then
         echo "This script must be run as root or with sudo. Please try again with sudo."
         exit 1
+    fi
+}
+
+upgrade_installer_script() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Upgrading Installer Script"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    SCRIPT_URL="https://raw.githubusercontent.com/Xandeum/xandminer-installer/master/install.sh"
+    SCRIPT_PATH="$0"
+    BACKUP_PATH="${SCRIPT_PATH}.bak-$(date +%Y%m%d%H%M%S)"
+    TEMP_SCRIPT="/tmp/install.sh.tmp"
+    
+    echo "Downloading latest version from GitHub..."
+    if wget -q -O "$TEMP_SCRIPT" "$SCRIPT_URL"; then
+        echo "✓ Download successful"
+        
+        # Check if the downloaded file is valid
+        if [ -s "$TEMP_SCRIPT" ]; then
+            echo "Creating backup at: $BACKUP_PATH"
+            cp "$SCRIPT_PATH" "$BACKUP_PATH"
+            
+            echo "Replacing current script with new version..."
+            mv "$TEMP_SCRIPT" "$SCRIPT_PATH"
+            chmod +x "$SCRIPT_PATH"
+            
+            echo ""
+            echo "✓ Installer script upgraded successfully!"
+            echo "✓ Backup saved at: $BACKUP_PATH"
+            echo ""
+            echo "Restarting script with new version..."
+            echo ""
+            sleep 2
+            exec "$SCRIPT_PATH"
+        else
+            echo "✗ Downloaded file is empty or invalid"
+            rm -f "$TEMP_SCRIPT"
+            echo "Upgrade failed. Returning to menu..."
+            sleep 2
+            show_menu
+        fi
+    else
+        echo "✗ Failed to download the script from GitHub"
+        echo "Please check your internet connection and try again."
+        rm -f "$TEMP_SCRIPT"
+        sleep 2
+        show_menu
     fi
 }
 
