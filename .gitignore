@@ -1,0 +1,26 @@
+# Build outputs
+xandminer/
+xandminerd/
+node_modules/
+
+# Service files (downloaded during install)
+*.service
+
+# Backup files
+*.bak
+*.bak-*
+
+# Temporary files
+*.tmp
+/tmp/
+
+# Keypair files (sensitive)
+*.json
+keypairs/
+
+# Log files
+*.log
+
+# System files
+.DS_Store
+*~
