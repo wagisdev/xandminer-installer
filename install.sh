@@ -1,5 +1,22 @@
 #!/bin/bash
 
+# Parse command-line arguments for dev mode
+DEV_MODE=false
+for arg in "$@"; do
+    if [ "$arg" = "-d" ]; then
+        DEV_MODE=true
+        break
+    fi
+done
+
+# Set installation directory based on mode
+if [ "$DEV_MODE" = true ]; then
+    INSTALL_DIR="/root"
+    echo ""
+else
+    INSTALL_DIR="/root"
+fi
+
 cat <<"EOF"
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -61,6 +78,149 @@ sudoCheck() {
         echo "This script must be run as root or with sudo. Please try again with sudo."
         exit 1
     fi
+}
+
+select_branch() {
+    local REPO_NAME=$1
+    local REPO_URL=$2
+    
+    echo "" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "  Branch Selection for $REPO_NAME" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "" >&2
+    echo "Fetching branches from $REPO_URL..." >&2
+    
+    # Create temporary directory for branch listing
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+    
+    # Clone with minimal depth to get branch info
+    git clone --bare "$REPO_URL" repo.git 2>/dev/null || {
+        echo "Error: Failed to fetch repository information" >&2
+        rm -rf "$TEMP_DIR"
+        return 1
+    }
+    
+    cd repo.git
+    
+    # Get 10 most recent branches with commit info
+    echo "Most recent 10 branches:" >&2
+    echo "" >&2
+    
+    # Format: branch-name | commit-date | commit-message
+    git for-each-ref --sort=-committerdate refs/heads/ --format='%(refname:short)|%(committerdate:short)|%(contents:subject)' --count=10 > /tmp/branches.txt
+    
+    # Display branches with numbers
+    local counter=1
+    declare -a BRANCH_ARRAY
+    
+    while IFS='|' read -r branch date message; do
+        BRANCH_ARRAY[$counter]="$branch"
+        printf "%2d. %-30s %s  %s\n" "$counter" "$branch" "$date" "$message" >&2
+        ((counter++))
+    done < /tmp/branches.txt
+    
+    echo "" >&2
+    
+    # Clean up temp directory
+    cd /
+    rm -rf "$TEMP_DIR"
+    rm -f /tmp/branches.txt
+    
+    # Prompt for selection
+    while true; do
+        read -p "Select branch number (1-10) or enter custom branch name: " BRANCH_CHOICE >&2
+        
+        # Check if input is a number
+        if [[ "$BRANCH_CHOICE" =~ ^[0-9]+$ ]] && [ "$BRANCH_CHOICE" -ge 1 ] && [ "$BRANCH_CHOICE" -lt "$counter" ]; then
+            SELECTED_BRANCH="${BRANCH_ARRAY[$BRANCH_CHOICE]}"
+            echo "Selected: $SELECTED_BRANCH" >&2
+            echo "$SELECTED_BRANCH"
+            return 0
+        elif [ -n "$BRANCH_CHOICE" ]; then
+            # Treat as custom branch name
+            echo "Using custom branch: $BRANCH_CHOICE" >&2
+            echo "$BRANCH_CHOICE" >&2
+            return 0
+        else
+            echo "Invalid selection. Please try again." >&2
+        fi
+    done
+}
+
+select_pod_version() {
+    # All output to stderr for visibility during command substitution
+    echo "" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "  Trynet Pod Version Selection" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "" >&2
+    echo "Adding trynet repository..." >&2
+    
+    # Add trynet repository
+    echo "deb [trusted=yes] https://raw.githubusercontent.com/Xandeum/trynet-packages/main/ stable main" | tee /etc/apt/sources.list.d/xandeum-pod-trynet.list >/dev/null
+    apt-get update >/dev/null 2>&1
+    
+    echo "Fetching available trynet versions..." >&2
+    echo "" >&2
+    
+    # Get trynet versions and format them
+    apt-cache madison pod 2>/dev/null | grep trynet | head -10 | awk '{print $3}' > /tmp/pod_versions_$$.txt
+    
+    if [ ! -s /tmp/pod_versions_$$.txt ]; then
+        echo "Error: Could not fetch trynet versions. Using latest stable." >&2
+        echo "stable"
+        return 0
+    fi
+    
+    echo "Available trynet pod versions (10 most recent):" >&2
+    echo "" >&2
+    
+    # Display versions with numbers
+    local counter=1
+    declare -a VERSION_ARRAY
+    
+    while read -r version; do
+        VERSION_ARRAY[$counter]="$version"
+        # Extract timestamp and commit from version string
+        # Format: 0.4.2~trynet.20251126115954.bedda09-1
+        local timestamp=$(echo "$version" | grep -oP '(?<=trynet\.)\d{14}' | sed 's/\(.\{4\}\)\(.\{2\}\)\(.\{2\}\)/\1-\2-\3/')
+        local commit=$(echo "$version" | grep -oP '[a-f0-9]{7}(?=-1)' | head -1)
+        
+        printf "%2d. %-50s %s  %s\n" "$counter" "$version" "$timestamp" "$commit" >&2
+        ((counter++))
+    done < /tmp/pod_versions_$$.txt
+    
+    echo "" >&2
+    
+    # Clean up
+    rm -f /tmp/pod_versions_$$.txt
+    
+    # Prompt for selection
+    while true; do
+        read -p "Select version number (1-10), enter custom version, or press Enter for latest stable: " VERSION_CHOICE >&2
+        
+        # Empty = use stable
+        if [ -z "$VERSION_CHOICE" ]; then
+            echo "Using latest stable version" >&2
+            echo "stable"
+            return 0
+        # Check if input is a number
+        elif [[ "$VERSION_CHOICE" =~ ^[0-9]+$ ]] && [ "$VERSION_CHOICE" -ge 1 ] && [ "$VERSION_CHOICE" -lt "$counter" ]; then
+            SELECTED_VERSION="${VERSION_ARRAY[$VERSION_CHOICE]}"
+            echo "Selected: $SELECTED_VERSION" >&2
+            echo "$SELECTED_VERSION"
+            return 0
+        elif [ -n "$VERSION_CHOICE" ]; then
+            # Treat as custom version string
+            echo "Using custom version: $VERSION_CHOICE" >&2
+            echo "$VERSION_CHOICE"
+            return 0
+        else
+            echo "Invalid selection. Please try again." >&2
+        fi
+    done
 }
 
 upgrade_installer_script() {
@@ -151,6 +311,10 @@ upgrade_install() {
 
 start_install() {
     sudoCheck
+    
+    # Change to installation directory
+    cd "$INSTALL_DIR"
+    
     # Update system packages
     echo "Updating system packages..."
     apt update && apt upgrade -y
@@ -161,19 +325,56 @@ start_install() {
     curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
     apt-get install -y nodejs
 
+    # Handle dev mode branch selection
+    if [ "$DEV_MODE" = true ]; then
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  DEV MODE: Repository Branch Selection"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        # Select branch for xandminer
+        XANDMINER_BRANCH=$(select_branch "xandminer" "https://github.com/Xandeum/xandminer.git")
+        
+        # Select branch for xandminerd
+        XANDMINERD_BRANCH=$(select_branch "xandminerd" "https://github.com/Xandeum/xandminerd.git")
+        
+        # Select pod trynet version
+        POD_VERSION=$(select_pod_version)
+        
+        echo ""
+        echo "Selected branches:"
+        echo "  xandminer: $XANDMINER_BRANCH"
+        echo "  xandminerd: $XANDMINERD_BRANCH"
+        echo "  pod: $POD_VERSION"
+        echo ""
+    fi
+
     if [ -d "xandminer" ] && [ -d "xandminerd" ]; then
-        echo "Repositories already exist. Pulling latest changes..."
+        echo "Repositories already exist. Updating..."
 
         (
             cd xandminer
             git stash push -m "Auto-stash before pull" || true
-            git pull
+            if [ "$DEV_MODE" = true ]; then
+                git fetch origin
+                git checkout "$XANDMINER_BRANCH"
+                git pull origin "$XANDMINER_BRANCH"
+            else
+                git pull
+            fi
         )
 
         (
             cd xandminerd
             git stash push -m "Auto-stash before pull" || true
-            git pull
+            if [ "$DEV_MODE" = true ]; then
+                git fetch origin
+                git checkout "$XANDMINERD_BRANCH"
+                git pull origin "$XANDMINERD_BRANCH"
+            else
+                git pull
+            fi
 
             if [ -f "keypairs/pnode-keypair.json" ]; then
                 echo "Found pnode-keypair.json. Copying to /local/keypairs/ if not already present..."
@@ -192,6 +393,19 @@ start_install() {
         echo "Cloning repositories..."
         git clone https://github.com/Xandeum/xandminer.git
         git clone https://github.com/Xandeum/xandminerd.git
+        
+        if [ "$DEV_MODE" = true ]; then
+            # Checkout selected branches
+            (
+                cd xandminer
+                git checkout "$XANDMINER_BRANCH"
+            )
+            
+            (
+                cd xandminerd
+                git checkout "$XANDMINERD_BRANCH"
+            )
+        fi
     fi
 
     install_pod
@@ -200,7 +414,9 @@ start_install() {
     wget -O xandminer.service "https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/xandminer.service"
 
     echo "Setting up Xandminer web as a system service..."
-    cp /root/xandminer.service /etc/systemd/system/
+    
+    
+    cp xandminer.service /etc/systemd/system/
 
     # Build and run xandminer app
     echo "Building and running xandminer app..."
@@ -214,11 +430,11 @@ start_install() {
 
     echo "Xandminer web Service Running On Port : 3000"
 
-    cp /root/xandminerd.service /etc/systemd/system/
+    cp xandminerd.service /etc/systemd/system/
 
     # Set up Xandminer as a service
     echo "Setting up Xandminerd as a system service..."
-    cd /root/xandminerd
+    cd xandminerd
     npm install
     systemctl daemon-reload
     systemctl enable xandminerd.service --now
@@ -272,6 +488,7 @@ restart_service() {
     systemctl restart xandminerd.service
     systemctl restart xandminer.service
 }
+
 install_pod() {
     sudo apt-get install -y apt-transport-https ca-certificates
 
@@ -279,7 +496,15 @@ install_pod() {
 
     sudo apt-get update
 
-    sudo apt-get install pod
+    # Install pod (version depends on installation mode)
+    if [ "$DEV_MODE" = true ] && [ -n "$POD_VERSION" ] && [ "$POD_VERSION" != "stable" ]; then
+        echo "Installing trynet pod version: $POD_VERSION"
+        echo "⚠️  Note: This may downgrade from a newer stable version"
+        sudo apt-get install -y --allow-downgrades pod=$POD_VERSION
+    else
+        echo "Installing latest stable pod version"
+        sudo apt-get install -y pod
+    fi
 
     # Ask for keypair path
     echo ""
@@ -292,26 +517,52 @@ install_pod() {
     echo ""
     read -p "Enter full path to keypair file (or press Enter to skip): " KEYPAIR_PATH
 
+    # Ask for public/private configuration
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "pRPC API Access Configuration"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Would you like to make the pRPC API publicly accessible?"
+    echo ""
+    echo "  Private (default): --rpc-ip 127.0.0.1 (localhost only)"
+    echo "  Public:            --rpc-ip 0.0.0.0 (accessible from any network interface)"
+    echo ""
+    echo "⚠️  WARNING: Public access exposes your pRPC API to the network."
+    echo "    Only use this if you understand the security implications."
+    echo ""
+    read -p "Make pRPC API public? (y/N): " MAKE_PUBLIC
+
     # Construct ExecStart command based on user input
+    EXEC_START_CMD="/usr/bin/pod"
+    
+    # Add keypair if provided
     if [ -n "$KEYPAIR_PATH" ]; then
         # Validate the path exists
         if [ -f "$KEYPAIR_PATH" ]; then
             echo "Using keypair at: $KEYPAIR_PATH"
-            EXEC_START_CMD="/usr/bin/pod --keypair $KEYPAIR_PATH"
+            EXEC_START_CMD="$EXEC_START_CMD --keypair $KEYPAIR_PATH"
         else
             echo "WARNING: File not found at $KEYPAIR_PATH"
             read -p "File doesn't exist. Continue anyway? (y/n): " CONTINUE
             if [[ "$CONTINUE" =~ ^[Yy]$ ]]; then
                 echo "Proceeding with the provided path anyway..."
-                EXEC_START_CMD="/usr/bin/pod --keypair $KEYPAIR_PATH"
+                EXEC_START_CMD="$EXEC_START_CMD --keypair $KEYPAIR_PATH"
             else
-                echo "Using default pod configuration without keypair flag."
-                EXEC_START_CMD="/usr/bin/pod"
+                echo "Skipping keypair configuration."
             fi
         fi
     else
-        echo "No keypair path provided. Using default pod configuration."
-        EXEC_START_CMD="/usr/bin/pod"
+        echo "No keypair path provided."
+    fi
+    
+    # Add RPC IP configuration
+    if [[ "$MAKE_PUBLIC" =~ ^[Yy]$ ]]; then
+        echo "✓ Configuring pod with PUBLIC pRPC API (--rpc-ip 0.0.0.0)"
+        echo "⚠️  Make sure port 6000 is accessible through your firewall"
+        EXEC_START_CMD="$EXEC_START_CMD --rpc-ip 0.0.0.0"
+    else
+        echo "✓ Configuring pod with PRIVATE pRPC API (--rpc-ip 127.0.0.1)"
+        EXEC_START_CMD="$EXEC_START_CMD --rpc-ip 127.0.0.1"
     fi
 
     SERVICE_FILE="/etc/systemd/system/pod.service"
@@ -347,9 +598,20 @@ EOF
 
     echo " pod.service is now running. Check status with:"
     echo " sudo systemctl status pod.service"
+    
+    if [[ "$MAKE_PUBLIC" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "⚠️  SECURITY REMINDER"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Your pRPC API is now publicly accessible on port 6000"
+        echo "Ensure your firewall is properly configured:"
+        echo "  sudo ufw allow 6000/tcp"
+        echo "  sudo ufw allow 9001/tcp  # For gossip protocol"
+        echo ""
+    fi
 
 }
-
 actions() {
     echo "1. Restart Service"
     echo "2. Stop Service"
