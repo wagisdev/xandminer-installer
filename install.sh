@@ -149,6 +149,80 @@ select_branch() {
     done
 }
 
+select_pod_version() {
+    # All output to stderr for visibility during command substitution
+    echo "" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "  Trynet Pod Version Selection" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "" >&2
+    echo "Adding trynet repository..." >&2
+    
+    # Add trynet repository
+    echo "deb [trusted=yes] https://raw.githubusercontent.com/Xandeum/trynet-packages/main/ stable main" | tee /etc/apt/sources.list.d/xandeum-pod-trynet.list >/dev/null
+    apt-get update >/dev/null 2>&1
+    
+    echo "Fetching available trynet versions..." >&2
+    echo "" >&2
+    
+    # Get trynet versions and format them
+    apt-cache madison pod 2>/dev/null | grep trynet | head -10 | awk '{print $3}' > /tmp/pod_versions_$$.txt
+    
+    if [ ! -s /tmp/pod_versions_$$.txt ]; then
+        echo "Error: Could not fetch trynet versions. Using latest stable." >&2
+        echo "stable"
+        return 0
+    fi
+    
+    echo "Available trynet pod versions (10 most recent):" >&2
+    echo "" >&2
+    
+    # Display versions with numbers
+    local counter=1
+    declare -a VERSION_ARRAY
+    
+    while read -r version; do
+        VERSION_ARRAY[$counter]="$version"
+        # Extract timestamp and commit from version string
+        # Format: 0.4.2~trynet.20251126115954.bedda09-1
+        local timestamp=$(echo "$version" | grep -oP '(?<=trynet\.)\d{14}' | sed 's/\(.\{4\}\)\(.\{2\}\)\(.\{2\}\)/\1-\2-\3/')
+        local commit=$(echo "$version" | grep -oP '[a-f0-9]{7}(?=-1)' | head -1)
+        
+        printf "%2d. %-50s %s  %s\n" "$counter" "$version" "$timestamp" "$commit" >&2
+        ((counter++))
+    done < /tmp/pod_versions_$$.txt
+    
+    echo "" >&2
+    
+    # Clean up
+    rm -f /tmp/pod_versions_$$.txt
+    
+    # Prompt for selection
+    while true; do
+        read -p "Select version number (1-10), enter custom version, or press Enter for latest stable: " VERSION_CHOICE >&2
+        
+        # Empty = use stable
+        if [ -z "$VERSION_CHOICE" ]; then
+            echo "Using latest stable version" >&2
+            echo "stable"
+            return 0
+        # Check if input is a number
+        elif [[ "$VERSION_CHOICE" =~ ^[0-9]+$ ]] && [ "$VERSION_CHOICE" -ge 1 ] && [ "$VERSION_CHOICE" -lt "$counter" ]; then
+            SELECTED_VERSION="${VERSION_ARRAY[$VERSION_CHOICE]}"
+            echo "Selected: $SELECTED_VERSION" >&2
+            echo "$SELECTED_VERSION"
+            return 0
+        elif [ -n "$VERSION_CHOICE" ]; then
+            # Treat as custom version string
+            echo "Using custom version: $VERSION_CHOICE" >&2
+            echo "$VERSION_CHOICE"
+            return 0
+        else
+            echo "Invalid selection. Please try again." >&2
+        fi
+    done
+}
+
 upgrade_installer_script() {
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -265,10 +339,14 @@ start_install() {
         # Select branch for xandminerd
         XANDMINERD_BRANCH=$(select_branch "xandminerd" "https://github.com/Xandeum/xandminerd.git")
         
+        # Select pod trynet version
+        POD_VERSION=$(select_pod_version)
+        
         echo ""
         echo "Selected branches:"
         echo "  xandminer: $XANDMINER_BRANCH"
         echo "  xandminerd: $XANDMINERD_BRANCH"
+        echo "  pod: $POD_VERSION"
         echo ""
     fi
 
@@ -418,7 +496,15 @@ install_pod() {
 
     sudo apt-get update
 
-    sudo apt-get install pod
+    # Install pod (version depends on installation mode)
+    if [ "$DEV_MODE" = true ] && [ -n "$POD_VERSION" ] && [ "$POD_VERSION" != "stable" ]; then
+        echo "Installing trynet pod version: $POD_VERSION"
+        echo "⚠️  Note: This may downgrade from a newer stable version"
+        sudo apt-get install -y --allow-downgrades pod=$POD_VERSION
+    else
+        echo "Installing latest stable pod version"
+        sudo apt-get install -y pod
+    fi
 
     # Ask for keypair path
     echo ""
