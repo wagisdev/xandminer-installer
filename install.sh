@@ -506,16 +506,26 @@ install_pod() {
         sudo apt-get install -y pod
     fi
 
-    # Ask for keypair path
+     # Ask for keypair path
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "Keypair Configuration"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Would you like to provide a custom keypair path for the pod service?"
-    echo "If you provide a path, the pod will start with --keypair flag."
-    echo "If you skip this (press Enter), the pod will use its default behavior."
     echo ""
-    read -p "Enter full path to keypair file (or press Enter to skip): " KEYPAIR_PATH
+    echo "Enter the path to your pNode keypair file."
+    echo ""
+    echo "  • Press Enter to use default: /local/keypairs/pnode-keypair.json"
+    echo "  • Enter a custom path if your keypair is elsewhere"
+    echo "  • Type 'none' to skip keypair configuration (pod will run without --keypair flag)"
+    echo ""
+    read -p "Keypair path [/local/keypairs/pnode-keypair.json]: " KEYPAIR_PATH
+    
+    # Handle the three cases
+    if [ -z "$KEYPAIR_PATH" ]; then
+        KEYPAIR_PATH="/local/keypairs/pnode-keypair.json"
+    elif [ "$KEYPAIR_PATH" = "none" ] || [ "$KEYPAIR_PATH" = "NONE" ]; then
+        KEYPAIR_PATH=""
+    fi
 
     # Ask for public/private configuration
     echo ""
